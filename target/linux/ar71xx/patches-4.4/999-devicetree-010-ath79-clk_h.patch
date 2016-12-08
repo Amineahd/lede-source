@@ -1,0 +1,24 @@
+diff -rupN a/include/dt-bindings/clock/ath79-clk.h b/include/dt-bindings/clock/ath79-clk.h
+--- a/include/dt-bindings/clock/ath79-clk.h
++++ b/include/dt-bindings/clock/ath79-clk.h
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2014, 2016 Antony Pavlov <antonynpavlov@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __DT_BINDINGS_ATH79_CLK_H
++#define __DT_BINDINGS_ATH79_CLK_H
++
++#define ATH79_CLK_REF          0
++#define ATH79_CLK_CPU          1
++#define ATH79_CLK_DDR          2
++#define ATH79_CLK_AHB          3
++
++#define ATH79_CLK_END          4
++
++#endif /* __DT_BINDINGS_ATH79_CLK_H */
