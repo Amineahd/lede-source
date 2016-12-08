@@ -1,0 +1,120 @@
+diff -rupN a/arch/mips/ath79/clock.c b/arch/mips/ath79/clock.c
+--- a/arch/mips/ath79/clock.c
++++ b/arch/mips/ath79/clock.c
+@@ -155,15 +155,34 @@ static void __init ar724x_clocks_init(vo
+ 	clk_add_alias("uart", NULL, "ahb", NULL);
+ }
+ 
++static struct clk_onecell_data * __init ar933x_clk_init(
++	struct clk *ref_clk, void __iomem *pll_base)
++{
++	u32 pll, clock_ctrl;
++	u32 mult, div, ddr_div, ahb_div;
++
++	pll = __raw_readl(pll_base + AR933X_PLL_CPU_CONFIG_REG);
++
++	mult = ((pll >> AR933X_PLL_CPU_CONFIG_NINT_SHIFT) & AR933X_PLL_CPU_CONFIG_NINT_MASK);
++	div = ((pll >> AR933X_PLL_CPU_CONFIG_REFDIV_SHIFT) & AR933X_PLL_CPU_CONFIG_REFDIV_MASK) * 2;
++
++	clock_ctrl = __raw_readl(pll_base + AR933X_PLL_CLOCK_CTRL_REG);
++	ddr_div = ((clock_ctrl >> AR933X_PLL_CLOCK_CTRL_DDR_DIV_SHIFT) & AR933X_PLL_CLOCK_CTRL_DDR_DIV_MASK) + 1;
++	ahb_div = ((clock_ctrl >> AR933X_PLL_CLOCK_CTRL_AHB_DIV_SHIFT) & AR933X_PLL_CLOCK_CTRL_AHB_DIV_MASK) + 1;
++
++	clks_ng[ATH79_CLK_REF] = ref_clk;
++	clks_ng[ATH79_CLK_CPU] = ath79_reg_ffclk("cpu", "ref", mult, div);
++	clks_ng[ATH79_CLK_DDR] = ath79_reg_ffclk("ddr", "ref", mult, div * ddr_div);
++	clks_ng[ATH79_CLK_AHB] = ath79_reg_ffclk("ahb", "ref", mult, div * ahb_div);
++
++	return &clk_data_ng;
++}
++
+ static void __init ar933x_clocks_init(void)
+ {
++	struct clk *ref_clk;
++	struct clk_onecell_data *clk_data;
+ 	unsigned long ref_rate;
+-	unsigned long cpu_rate;
+-	unsigned long ddr_rate;
+-	unsigned long ahb_rate;
+-	u32 clock_ctrl;
+-	u32 cpu_config;
+-	u32 freq;
+ 	u32 t;
+ 
+ 	t = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
+@@ -172,46 +191,12 @@ static void __init ar933x_clocks_init(vo
+ 	else
+ 		ref_rate = (25 * 1000 * 1000);
+ 
+-	clock_ctrl = ath79_pll_rr(AR933X_PLL_CLOCK_CTRL_REG);
+-	if (clock_ctrl & AR933X_PLL_CLOCK_CTRL_BYPASS) {
+-		cpu_rate = ref_rate;
+-		ahb_rate = ref_rate;
+-		ddr_rate = ref_rate;
+-	} else {
+-		cpu_config = ath79_pll_rr(AR933X_PLL_CPU_CONFIG_REG);
++	ref_clk = ath79_add_sys_clkdev("ref", ref_rate);
+ 
+-		t = (cpu_config >> AR933X_PLL_CPU_CONFIG_REFDIV_SHIFT) &
+-		    AR933X_PLL_CPU_CONFIG_REFDIV_MASK;
+-		freq = ref_rate / t;
+-
+-		t = (cpu_config >> AR933X_PLL_CPU_CONFIG_NINT_SHIFT) &
+-		    AR933X_PLL_CPU_CONFIG_NINT_MASK;
+-		freq *= t;
+-
+-		t = (cpu_config >> AR933X_PLL_CPU_CONFIG_OUTDIV_SHIFT) &
+-		    AR933X_PLL_CPU_CONFIG_OUTDIV_MASK;
+-		if (t == 0)
+-			t = 1;
+-
+-		freq >>= t;
+-
+-		t = ((clock_ctrl >> AR933X_PLL_CLOCK_CTRL_CPU_DIV_SHIFT) &
+-		     AR933X_PLL_CLOCK_CTRL_CPU_DIV_MASK) + 1;
+-		cpu_rate = freq / t;
+-
+-		t = ((clock_ctrl >> AR933X_PLL_CLOCK_CTRL_DDR_DIV_SHIFT) &
+-		      AR933X_PLL_CLOCK_CTRL_DDR_DIV_MASK) + 1;
+-		ddr_rate = freq / t;
+-
+-		t = ((clock_ctrl >> AR933X_PLL_CLOCK_CTRL_AHB_DIV_SHIFT) &
+-		     AR933X_PLL_CLOCK_CTRL_AHB_DIV_MASK) + 1;
+-		ahb_rate = freq / t;
+-	}
++	clk_data = ar933x_clk_init(ref_clk, ath79_pll_base);
+ 
+-	ath79_add_sys_clkdev("ref", ref_rate);
+-	clks[0] = ath79_add_sys_clkdev("cpu", cpu_rate);
+-	clks[1] = ath79_add_sys_clkdev("ddr", ddr_rate);
+-	clks[2] = ath79_add_sys_clkdev("ahb", ahb_rate);
++	/* just make happy plat_time_init() from arch/mips/ath79/setup.c */
++	clk_register_clkdev(clk_data->clks[ATH79_CLK_REF], "ref", NULL);
+ 
+ 	clk_add_alias("wdt", NULL, "ahb", NULL);
+ 	clk_add_alias("uart", NULL, "ref", NULL);
+@@ -666,7 +651,6 @@ static void __init ath79_clocks_init_dt(
+ 
+ CLK_OF_DECLARE(ar7100, "qca,ar7100-pll", ath79_clocks_init_dt);
+ CLK_OF_DECLARE(ar7240, "qca,ar7240-pll", ath79_clocks_init_dt);
+-CLK_OF_DECLARE(ar9330, "qca,ar9330-pll", ath79_clocks_init_dt);
+ CLK_OF_DECLARE(ar9340, "qca,ar9340-pll", ath79_clocks_init_dt);
+ CLK_OF_DECLARE(ar9550, "qca,qca9550-pll", ath79_clocks_init_dt);
+ 
+@@ -688,7 +672,8 @@ static void __init ath79_clocks_init_dt_
+ 		goto err_clk;
+ 	}
+ 
+-	clk_data = ar724x_clk_init(ref_clk, pll_base);
++//	clk_data = ar724x_clk_init(ref_clk, pll_base);
++	clk_data = ar933x_clk_init(ref_clk, pll_base);
+ 	if (!clk_data) {
+ 		pr_err("%s: clk_init failed\n", np->full_name);
+ 		goto err_clk;
+@@ -715,5 +700,6 @@ err:
+ }
+ 
+ CLK_OF_DECLARE(ar9130_clk, "qca,ar9130-pll", ath79_clocks_init_dt_ng);
++CLK_OF_DECLARE(ar9330_clk, "qca,ar9330-pll", ath79_clocks_init_dt_ng);
+ 
+ #endif
