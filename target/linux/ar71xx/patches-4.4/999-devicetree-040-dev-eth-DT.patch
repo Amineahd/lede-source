@@ -1,0 +1,232 @@
+diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
+--- a/arch/mips/ath79/dev-eth.c
++++ b/arch/mips/ath79/dev-eth.c
+@@ -22,6 +22,10 @@
+ #include <linux/clk.h>
+ #include <linux/sizes.h>
+ 
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_net.h>
++
+ #include <asm/mach-ath79/ath79.h>
+ #include <asm/mach-ath79/ar71xx_regs.h>
+ #include <asm/mach-ath79/irq.h>
+@@ -1260,3 +1264,217 @@ void __init ath79_init_local_mac(unsigne
+ 		dst[i] = src[i];
+ 	dst[0] |= 0x02;
+ }
++
++
++static int ath79_eth_probe(struct platform_device *_pdev)
++{
++	struct platform_device *pdev;
++	struct ag71xx_platform_data *pdata;
++
++	unsigned int id;
++	const char *phy_if_mode;
++	const char* mac_addr;
++
++	if (of_property_read_u32(_pdev->dev.of_node, "ath79-eth-id", &id)) {
++		printk(KERN_ERR "ar71xx: no ath79-eth-id given\n");
++		return -1;
++	}
++
++	ath79_init_eth_pll_data(id);
++
++	if (id == 0)
++		pdev = &ath79_eth0_device;
++	else
++		pdev = &ath79_eth1_device;
++
++	if (id == 1) {
++
++		// still needs to be done somewhere
++//		ath79_gpio_function_disable(AR933X_GPIO_FUNC_ETH_SWITCH_LED0_EN |
++//					    AR933X_GPIO_FUNC_ETH_SWITCH_LED1_EN |
++//					    AR933X_GPIO_FUNC_ETH_SWITCH_LED2_EN |
++//					    AR933X_GPIO_FUNC_ETH_SWITCH_LED3_EN |
++//					    AR933X_GPIO_FUNC_ETH_SWITCH_LED4_EN);
++
++		ath79_setup_ar933x_phy4_switch(true, true);
++	}
++
++	if (id == 0) {
++		if (of_property_read_bool(_pdev->dev.of_node, "ath79-physwap"))
++			ath79_setup_ar933x_phy4_switch(false, false);
++	}
++
++	pdata = pdev->dev.platform_data;
++
++	pdata->max_frame_len = 1540;
++	pdata->desc_pktlen_mask = 0xfff;
++
++	phy_if_mode = of_get_property(_pdev->dev.of_node, "phy-mode", NULL);
++	if (!strcmp(phy_if_mode, "mii")) {
++		pdata->phy_if_mode = PHY_INTERFACE_MODE_MII;
++	} else if (!strcmp(phy_if_mode, "gmii")) {
++		pdata->phy_if_mode = PHY_INTERFACE_MODE_GMII;
++	} else if (!strcmp(phy_if_mode, "rgmii")) {
++		pdata->phy_if_mode = PHY_INTERFACE_MODE_RGMII;
++	} else if (!strcmp(phy_if_mode, "rmii")) {
++		pdata->phy_if_mode = PHY_INTERFACE_MODE_RMII;
++	}
++
++	if (id == 0)
++		pdata->ddr_flush = ath79_ddr_flush_ge0;
++	else
++		pdata->ddr_flush = ath79_ddr_flush_ge1;
++
++	if (id == 0) {
++		pdata->reset_bit = AR933X_RESET_GE0_MAC |
++				   AR933X_RESET_GE0_MDIO;
++
++		pdata->set_speed = ath79_set_speed_dummy;
++
++		pdata->phy_mask = BIT(4);
++	} else {
++		pdata->reset_bit = AR933X_RESET_GE1_MAC |
++				   AR933X_RESET_GE1_MDIO;
++
++		pdata->set_speed = ath79_set_speed_dummy;
++
++		pdata->speed = SPEED_1000;
++		pdata->has_gbit = 1;
++		pdata->duplex = DUPLEX_FULL;
++		pdata->switch_data = &ath79_switch_data;
++		pdata->use_flow_control = 1;
++
++		ath79_switch_data.phy_poll_mask |= BIT(4);
++	}
++
++	pdata->is_ar724x = 1;
++
++	if (!pdata->fifo_cfg1)
++		pdata->fifo_cfg1 = 0x0010ffff;
++	if (!pdata->fifo_cfg2)
++		pdata->fifo_cfg2 = 0x015500aa;
++	if (!pdata->fifo_cfg3)
++		pdata->fifo_cfg3 = 0x01f00140;
++
++	switch (pdata->phy_if_mode) {
++	case PHY_INTERFACE_MODE_GMII:
++	case PHY_INTERFACE_MODE_RGMII:
++	case PHY_INTERFACE_MODE_SGMII:
++		if (!pdata->has_gbit) {
++			printk(KERN_ERR "ar71xx: no gbit available on eth%d\n",
++					id);
++			return -1;
++		}
++		/* fallthrough */
++	default:
++		break;
++	}
++
++	mac_addr = of_get_mac_address(_pdev->dev.of_node);
++	if (mac_addr) {
++		ether_addr_copy(pdata->mac_addr, mac_addr);
++	}
++
++	if (!is_valid_ether_addr(pdata->mac_addr)) {
++		// flash / mtd partition for MAC address is not present yet,
++		// try again later
++		return -EPROBE_DEFER;
++	}
++
++	pdata->mii_bus_dev = &ath79_mdio1_device.dev;
++
++	/* Reset the device */
++	ath79_device_reset_set(pdata->reset_bit);
++	msleep(100);
++
++	ath79_device_reset_clear(pdata->reset_bit);
++	msleep(100);
++
++	platform_device_register(pdev);
++
++	return 0;
++}
++
++static const struct of_device_id ath79_eth_of_match[] = {
++	{ .compatible = "ath79,ethernet" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, ath79_eth_of_match);
++
++static struct platform_driver ath79_eth_driver = {
++	.probe		= ath79_eth_probe,
++	.driver = {
++		.name = "ath79-eth",
++		.of_match_table = of_match_ptr(ath79_eth_of_match),
++	}
++};
++
++
++module_platform_driver(ath79_eth_driver);
++
++
++
++
++
++static int ath79_mdio_probe(struct platform_device *_pdev)
++{
++	struct platform_device *pdev;
++	struct ag71xx_mdio_platform_data *pdata;
++	unsigned int id;
++	u32 phy_mask;
++
++	if (of_property_read_u32(_pdev->dev.of_node, "ath79-mdio-id", &id)) {
++		printk(KERN_ERR "ar71xx: no ath79-mdio-id given\n");
++		return -1;
++	}
++
++	if (of_property_read_u32(_pdev->dev.of_node, "phy-mask", &phy_mask)) {
++		printk(KERN_ERR "ar71xx: no phy-mask given\n");
++		return -1;
++	}
++
++	if (id == 0) {
++		pdev = &ath79_mdio0_device;
++		pdata = &ath79_mdio0_data;
++	} else {
++		pdev = &ath79_mdio1_device;
++		pdata = &ath79_mdio1_data;
++	}
++
++	pdata->phy_mask = phy_mask;
++
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar7240"))
++		pdata->is_ar7240 = 1;
++
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar9330"))
++		pdata->is_ar9330 = 1;
++
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar934x"))
++		pdata->is_ar934x = 1;
++
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-builtin-switch"))
++		pdata->builtin_switch = 1;
++
++	platform_device_register(pdev);
++
++	return 0;
++}
++
++static const struct of_device_id ath79_mdio_of_match[] = {
++	{ .compatible = "ath79,mdio" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, ath79_mdio_of_match);
++
++static struct platform_driver ath79_mdio_driver = {
++	.probe		= ath79_mdio_probe,
++	.driver = {
++		.name = "ath79-mdio",
++		.of_match_table = of_match_ptr(ath79_mdio_of_match),
++	}
++};
++
++
++module_platform_driver(ath79_mdio_driver);
