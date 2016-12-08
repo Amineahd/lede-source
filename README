@@ -1,29 +1,31 @@
-This is the buildsystem for the LEDE Linux distribution.
+This branch is a proof of concept for bringing devicetree support
+into the ar71xx target.
 
-Please use "make menuconfig" to choose your preferred
-configuration for the toolchain and firmware.
+Currently, only the SoC AR9331 is supported!
 
-You need to have installed gcc, binutils, bzip2, flex, python, perl, make,
-find, grep, diff, unzip, gawk, getopt, subversion, libz-dev and libc headers.
+This is tested on
+	TP-Link WR740N-v4
+	TP-Link WR741ND-v4
+	TP-Link MR3020-v1
 
-Run "./scripts/feeds update -a" to get all the latest package definitions
-defined in feeds.conf / feeds.conf.default respectively
-and "./scripts/feeds install -a" to install symlinks of all of them into
-package/feeds/.
+Working:
+	Clocks
+	SPI Flash
+	Serial
+	eth0/1 + switch
+	wifi
+	USB
+	LEDs
+	Buttons
+	wifi calibration + MAC addresses come from flash
+	watchdog behaves strange, therefore currently disabled
 
-Use "make menuconfig" to configure your image.
+Especially the clock stuff is based on work from Antony Pavlov:
+https://www.linux-mips.org/archives/linux-mips/2016-01/msg00373.html
+https://www.linux-mips.org/archives/linux-mips/2016-02/msg00316.html
+https://www.linux-mips.org/archives/linux-mips/2016-02/msg00472.html
 
-Simply running "make" will build your firmware.
-It will download all sources, build the cross-compile toolchain, 
-the kernel and all choosen applications.
+Other parts are taken from lantiq and ramips target
 
-To build your own firmware you need to have access to a Linux, BSD or MacOSX system
-(case-sensitive filesystem required). Cygwin will not be supported because of
-the lack of case sensitiveness in the file system.
-
-
-Sunshine!
-	Your LEDE Community
-	http://www.lede-project.org
-
-
+Again, only the AR9331 is targeted, and some things are hardcoded for this
+chip; code needs to be rewritten for a more open approach.
