@@ -305,6 +305,9 @@ TARGET_DEVICES += tl-mr10u-v1 tl-mr11u-v1 tl-mr11u-v2 tl-mr12u-v1 tl-mr13u-v1
 
 define Device/tl-mr3020-v1
     $(Device/tplink-4mlzma)
+    DEVICE_DTS_DIR := ../dts
+    DEVICE_DTS := tl-mr3020
+    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-MR3020
     DEVICE_PACKAGES := kmod-usb-core kmod-usb2 kmod-usb-ledtrig-usbport
     BOARDNAME := TL-MR3020
@@ -461,6 +464,9 @@ endef
 
 define Device/tl-wr740n-v4
     $(Device/tplink-4mlzma)
+    DEVICE_DTS_DIR := ../dts
+    DEVICE_DTS := tl-wr740n
+    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-WR740N/ND v4
     BOARDNAME := TL-WR741ND-v4
     DEVICE_PROFILE := TLWR740
@@ -503,6 +509,9 @@ endef
 
 define Device/tl-wr741nd-v4
     $(Device/tplink-4mlzma)
+    DEVICE_DTS_DIR := ../dts
+    DEVICE_DTS := tl-wr741n
+    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-WR741N/ND v4
     BOARDNAME := TL-WR741ND-v4
     DEVICE_PROFILE := TLWR741
