@@ -39,8 +39,8 @@ define Device/tplink
   TPLINK_HWREV := 0x1
   TPLINK_HEADER_VERSION := 1
   LOADER_TYPE := gz
-  KERNEL := kernel-bin | append-dtb | lzma
-  KERNEL_INITRAMFS := kernel-bin | append-dtb | lzma | mktplinkfw-initramfs
+  KERNEL := kernel-bin | patch-cmdline | lzma
+  KERNEL_INITRAMFS := kernel-bin | patch-cmdline | lzma | mktplinkfw-initramfs
   IMAGES := sysupgrade.bin factory.bin
   IMAGE/sysupgrade.bin := append-rootfs | mktplinkfw sysupgrade
   IMAGE/factory.bin := append-rootfs | mktplinkfw factory
@@ -53,6 +53,13 @@ $(Device/tplink)
   COMPILE/loader-$(1).gz := loader-okli-compile
   KERNEL := copy-file $(KDIR)/vmlinux.bin.lzma | uImage lzma -M 0x4f4b4c49 | loader-okli $(1)
   KERNEL_INITRAMFS := copy-file $(KDIR)/vmlinux-initramfs.bin.lzma | loader-kernel-cmdline | mktplinkfw-initramfs
+endef
+
+define Device/tplink-appended-dtb
+  KERNEL := kernel-bin | append-dtb | lzma
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | lzma | mktplinkfw-initramfs
+  DEVICE_DTS_DIR := ../dts
+  KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
 endef
 
 define Device/tplink-4m
@@ -305,9 +312,8 @@ TARGET_DEVICES += tl-mr10u-v1 tl-mr11u-v1 tl-mr11u-v2 tl-mr12u-v1 tl-mr13u-v1
 
 define Device/tl-mr3020-v1
     $(Device/tplink-4mlzma)
-    DEVICE_DTS_DIR := ../dts
+    $(Device/tplink-appended-dtb)
     DEVICE_DTS := tl-mr3020
-    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-MR3020
     DEVICE_PACKAGES := kmod-usb-core kmod-usb2 kmod-usb-ledtrig-usbport
     BOARDNAME := TL-MR3020
@@ -464,9 +470,8 @@ endef
 
 define Device/tl-wr740n-v4
     $(Device/tplink-4mlzma)
-    DEVICE_DTS_DIR := ../dts
+    $(Device/tplink-appended-dtb)
     DEVICE_DTS := tl-wr740n
-    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-WR740N/ND v4
     BOARDNAME := TL-WR741ND-v4
     DEVICE_PROFILE := TLWR740
@@ -509,9 +514,8 @@ endef
 
 define Device/tl-wr741nd-v4
     $(Device/tplink-4mlzma)
-    DEVICE_DTS_DIR := ../dts
+    $(Device/tplink-appended-dtb)
     DEVICE_DTS := tl-wr741n
-    KERNEL_DEPENDS = $$(wildcard ../dts/$$(DEVICE_DTS).dts)
     DEVICE_TITLE := TP-LINK TL-WR741N/ND v4
     BOARDNAME := TL-WR741ND-v4
     DEVICE_PROFILE := TLWR741
