@@ -1,4 +1,3 @@
-diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
 --- a/arch/mips/ath79/dev-eth.c
 +++ b/arch/mips/ath79/dev-eth.c
 @@ -22,6 +22,10 @@
@@ -12,7 +11,7 @@ diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
  #include <asm/mach-ath79/ath79.h>
  #include <asm/mach-ath79/ar71xx_regs.h>
  #include <asm/mach-ath79/irq.h>
-@@ -1260,3 +1264,217 @@ void __init ath79_init_local_mac(unsigne
+@@ -1260,3 +1264,249 @@ void __init ath79_init_local_mac(unsigne
  		dst[i] = src[i];
  	dst[0] |= 0x02;
  }
@@ -26,6 +25,9 @@ diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
 +	unsigned int id;
 +	const char *phy_if_mode;
 +	const char* mac_addr;
++	const char *set_speed;
++
++	unsigned int u32_temp;
 +
 +	if (of_property_read_u32(_pdev->dev.of_node, "ath79-eth-id", &id)) {
 +		printk(KERN_ERR "ar71xx: no ath79-eth-id given\n");
@@ -78,28 +80,52 @@ diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
 +		pdata->ddr_flush = ath79_ddr_flush_ge1;
 +
 +	if (id == 0) {
-+		pdata->reset_bit = AR933X_RESET_GE0_MAC |
-+				   AR933X_RESET_GE0_MDIO;
-+
-+		pdata->set_speed = ath79_set_speed_dummy;
-+
 +		pdata->phy_mask = BIT(4);
 +	} else {
-+		pdata->reset_bit = AR933X_RESET_GE1_MAC |
-+				   AR933X_RESET_GE1_MDIO;
-+
-+		pdata->set_speed = ath79_set_speed_dummy;
-+
 +		pdata->speed = SPEED_1000;
-+		pdata->has_gbit = 1;
 +		pdata->duplex = DUPLEX_FULL;
 +		pdata->switch_data = &ath79_switch_data;
-+		pdata->use_flow_control = 1;
 +
 +		ath79_switch_data.phy_poll_mask |= BIT(4);
 +	}
 +
-+	pdata->is_ar724x = 1;
++	if (!of_property_read_u32(_pdev->dev.of_node, "ath79-reset-bit", &u32_temp)) {
++		pdata->reset_bit = u32_temp;
++	}
++
++	set_speed = of_get_property(_pdev->dev.of_node, "ath79-set-speed", NULL);
++	if (!strcmp(set_speed, "dummy")) {
++		pdata->set_speed = ath79_set_speed_dummy;
++	} else if (!strcmp(set_speed, "ath79")) {
++		if (id == 0)
++			pdata->set_speed = ath79_set_speed_ge0;
++		else
++			pdata->set_speed = ath79_set_speed_ge1;
++	} else if (!strcmp(set_speed, "ar91xx")) {
++		if (id == 0)
++			pdata->set_speed = ar91xx_set_speed_ge0;
++		else
++			pdata->set_speed = ar91xx_set_speed_ge1;
++	} else if (!strcmp(set_speed, "ar7242")) {
++		if (id == 0)
++			pdata->set_speed = ar7242_set_speed_ge0;;
++	} else if (!strcmp(set_speed, "ar934x")) {
++		if (id == 0)
++			pdata->set_speed = ar934x_set_speed_ge0;;
++	}
++
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-has-gbit"))
++		pdata->has_gbit = 1;
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar91xx"))
++		pdata->is_ar91xx = 1;
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar7240"))
++		pdata->is_ar7240 = 1;
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-is-ar724x"))
++		pdata->is_ar724x = 1;
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-has-ar8216"))
++		pdata->has_ar8216 = 1;
++	if (of_property_read_bool(_pdev->dev.of_node, "ath79-use-flow-control"))
++		pdata->use_flow_control = 1;
 +
 +	if (!pdata->fifo_cfg1)
 +		pdata->fifo_cfg1 = 0x0010ffff;
@@ -133,7 +159,12 @@ diff -rupN a/arch/mips/ath79/dev-eth.c b/arch/mips/ath79/dev-eth.c
 +		return -EPROBE_DEFER;
 +	}
 +
-+	pdata->mii_bus_dev = &ath79_mdio1_device.dev;
++	if (!of_property_read_u32(_pdev->dev.of_node, "ath79-mii-bus-dev", &u32_temp)) {
++		if (u32_temp == 0)
++			pdata->mii_bus_dev = &ath79_mdio0_device.dev;
++		else if (u32_temp == 1)
++			pdata->mii_bus_dev = &ath79_mdio1_device.dev;
++	}
 +
 +	/* Reset the device */
 +	ath79_device_reset_set(pdata->reset_bit);

@@ -181,6 +181,12 @@
 		phy-mode = "gmii";
 
 		ath79-eth-id = <1>;
+		ath79-reset-bit = <0x802000>;
+		ath79-set-speed = "dummy";
+		ath79-has-gbit;
+		ath79-is-ar724x;
+		ath79-use-flow-control;
+		ath79-mii-bus-dev = <1>;
 	};
 
 	eth1: ethernet@19000000 {
@@ -191,6 +197,10 @@
 		phy-mode = "mii";
 
 		ath79-eth-id = <0>;
+		ath79-reset-bit = <0x400200>;
+		ath79-set-speed = "dummy";
+		ath79-is-ar724x;
+		ath79-mii-bus-dev = <1>;
 	};
 
 	wifi0: wmac@1a000000 {
